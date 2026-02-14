@@ -1,0 +1,30 @@
+{
+  "name": "qwen3-tts-runpod",
+  "description": "Qwen3-TTS Text-to-Speech Serverless",
+  "type": "serverless",
+  "category": "audio",
+  "config": {
+    "runsOn": "GPU",
+    "containerDiskInGb": 20
+  },
+  "input": {
+    "text": {
+      "name": "Text",
+      "type": "string",
+      "description": "Text to convert to speech",
+      "required": true
+    },
+    "voice": {
+      "name": "Voice",
+      "type": "string",
+      "description": "Voice name (Vivian, Ryan, Cherry, etc.)",
+      "default": "Vivian"
+    },
+    "language": {
+      "name": "Language", 
+      "type": "string",
+      "description": "Language (Russian, English, Chinese, etc.)",
+      "default": "Russian"
+    }
+  }
+}
