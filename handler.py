@@ -1,6 +1,5 @@
 """
-RunPod Serverless Handler для Qwen3-TTS
-Озвучка текста через API
+RunPod Serverless Handler для Qwen3-TTS Voice Cloning
 """
 
 import runpod
@@ -9,24 +8,18 @@ import soundfile as sf
 import base64
 import io
 import os
+import tempfile
 
-# Глобальная переменная для модели
 model = None
 
 def load_model():
-    """Загрузка модели при первом запросе"""
     global model
     if model is None:
         from qwen_tts import Qwen3TTSModel
         
-        model_name = os.environ.get(
-            "MODEL_NAME", 
-            "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
-        )
-        
-        print(f"Загружаем модель: {model_name}")
+        print("Загружаем модель для клонирования голоса...")
         model = Qwen3TTSModel.from_pretrained(
-            model_name,
+            "Qwen/Qwen3-TTS-12Hz-1.7B-Base",  # Base модель для клонирования!
             device="cuda",
             torch_dtype=torch.bfloat16
         )
@@ -35,74 +28,58 @@ def load_model():
     return model
 
 
-def generate_speech(text, voice="Vivian", language="Russian", speed=1.0):
-    """Генерация аудио из текста"""
-    model = load_model()
-    
-    # Генерация
-    audio = model.generate(
-        text=text,
-        speaker=voice,
-        language=language
-    )
-    
-    # Конвертируем в WAV base64
-    buffer = io.BytesIO()
-    sf.write(buffer, audio, 24000, format="WAV")
-    buffer.seek(0)
-    audio_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    
-    return audio_base64
-
-
 def handler(job):
-    """
-    Основной обработчик запросов RunPod
-    
-    Input:
-        text: str - текст для озвучки
-        voice: str - голос (Vivian, Ryan, Cherry, Ethan, Aria и др.)
-        language: str - язык (Russian, English, Chinese, Japanese и др.)
-        
-    Output:
-        audio_base64: str - аудио в формате base64 WAV
-        sample_rate: int - частота дискретизации (24000)
-    """
     job_input = job.get("input", {})
     
-    # Получаем параметры
     text = job_input.get("text", "")
-    voice = job_input.get("voice", "Vivian")
+    ref_audio_base64 = job_input.get("ref_audio_base64", "")
+    ref_text = job_input.get("ref_text", "")
     language = job_input.get("language", "Russian")
     
-    # Валидация
     if not text:
         return {"error": "Параметр 'text' обязателен"}
     
-    if len(text) > 10000:
-        return {"error": "Текст слишком длинный (максимум 10000 символов)"}
+    if not ref_audio_base64:
+        return {"error": "Параметр 'ref_audio_base64' обязателен для клонирования голоса"}
     
     try:
-        # Генерируем аудио
-        audio_base64 = generate_speech(
+        model = load_model()
+        
+        # Декодируем reference audio
+        ref_audio_bytes = base64.b64decode(ref_audio_base64)
+        
+        # Сохраняем во временный файл
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            f.write(ref_audio_bytes)
+            ref_audio_path = f.name
+        
+        # Генерация с клонированием голоса
+        audio = model.generate(
             text=text,
-            voice=voice,
+            ref_audio=ref_audio_path,
+            ref_text=ref_text if ref_text else None,
             language=language
         )
+        
+        # Удаляем временный файл
+        os.unlink(ref_audio_path)
+        
+        # Конвертируем в base64
+        buffer = io.BytesIO()
+        sf.write(buffer, audio, 24000, format="WAV")
+        buffer.seek(0)
+        audio_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
         
         return {
             "audio_base64": audio_base64,
             "sample_rate": 24000,
             "format": "wav",
-            "text_length": len(text),
-            "voice": voice,
-            "language": language
+            "text_length": len(text)
         }
         
     except Exception as e:
         return {"error": str(e)}
 
 
-# Запуск serverless worker
 if __name__ == "__main__":
     runpod.serverless.start({"handler": handler})
