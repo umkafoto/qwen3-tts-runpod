@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir \
 # RUN python -c "from qwen_tts import Qwen3TTSModel; Qwen3TTSModel.from_pretrained('Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice')"
 
 # Копируем handler
-COPY src/handler.py /app/handler.py
+COPY handler.py /app/handler.py
 
 # Переменные окружения
 ENV MODEL_NAME="Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
