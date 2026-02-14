@@ -1,0 +1,28 @@
+# RunPod Serverless Configuration
+# https://docs.runpod.io/serverless/workers/development/overview
+
+name: qwen3-tts
+description: "Qwen3-TTS Text-to-Speech Serverless Endpoint"
+
+# Настройки Docker
+runtime:
+  python_version: "3.10"
+  cuda_version: "12.1"
+
+# Настройки GPU (рекомендуемые)
+gpu:
+  # Выбери один из вариантов:
+  # - RTX 4090 (быстрее, дороже)
+  # - RTX 3090 (медленнее, дешевле)
+  # - A100 (самый быстрый)
+  type: "RTX 4090"
+
+# Настройки масштабирования
+scaling:
+  min_workers: 0        # Полностью выключается когда не используется
+  max_workers: 3        # Максимум параллельных запросов
+  idle_timeout: 60      # Секунд до выключения после последнего запроса
+
+# Переменные окружения
+env:
+  MODEL_NAME: "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
