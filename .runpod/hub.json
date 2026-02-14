@@ -1,11 +1,11 @@
 {
   "name": "qwen3-tts-runpod",
-  "description": "Qwen3-TTS Text-to-Speech Serverless",
+  "description": "Qwen3-TTS Voice Cloning Serverless",
   "type": "serverless",
   "category": "audio",
   "config": {
     "runsOn": "GPU",
-    "containerDiskInGb": 20
+    "containerDiskInGb": 30
   },
   "input": {
     "text": {
@@ -14,16 +14,20 @@
       "description": "Text to convert to speech",
       "required": true
     },
-    "voice": {
-      "name": "Voice",
+    "ref_audio_base64": {
+      "name": "Reference Audio",
       "type": "string",
-      "description": "Voice name (Vivian, Ryan, Cherry, etc.)",
-      "default": "Vivian"
+      "description": "Base64 encoded reference audio for voice cloning"
+    },
+    "ref_text": {
+      "name": "Reference Text",
+      "type": "string",
+      "description": "Text spoken in reference audio (improves quality)"
     },
     "language": {
-      "name": "Language", 
+      "name": "Language",
       "type": "string",
-      "description": "Language (Russian, English, Chinese, etc.)",
+      "description": "Language (Russian, English, etc.)",
       "default": "Russian"
     }
   }
