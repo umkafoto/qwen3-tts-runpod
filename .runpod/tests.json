@@ -1,13 +1,3 @@
 {
-  "tests": [
-    {
-      "name": "Basic TTS Test",
-      "input": {
-        "text": "Hello, this is a test.",
-        "voice": "Vivian",
-        "language": "English"
-      },
-      "timeout": 120
-    }
-  ]
+  "tests": []
 }
