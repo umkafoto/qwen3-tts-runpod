@@ -97,7 +97,7 @@ def handler(job):
         ref_audio_base64 = job_input.get("ref_audio_base64")
         ref_text = job_input.get("ref_text", "")
         max_chunk_size = job_input.get("max_chunk_size", 1500)
-        pause_duration = job_input.get("pause_duration", 0.5)
+        pause_duration = job_input.get("pause_duration", 0.45)
         
         if not ref_audio_base64:
             return {"error": "Параметр 'ref_audio_base64' обязателен для клонирования голоса"}
