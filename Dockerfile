@@ -13,7 +13,8 @@ RUN pip install --no-cache-dir \
     runpod \
     torch \
     torchaudio \
-    openai-whisper
+    openai-whisper \
+    numpy
 
 COPY handler.py /app/handler.py
 

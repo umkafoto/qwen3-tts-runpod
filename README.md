@@ -1,150 +1,115 @@
-# Qwen3-TTS RunPod Serverless
+# Qwen3-TTS Voice Cloning - RunPod Serverless
 
-Serverless endpoint для озвучки текста через Qwen3-TTS на RunPod.
+Serverless endpoint для клонирования голоса с поддержкой длинных текстов (40k+ символов).
 
-## Быстрый старт
+## Возможности
 
-### 1. Форкни этот репозиторий
+- 🎤 Клонирование голоса по образцу (5-30 сек)
+- 📝 Автоматическая транскрипция образца через Whisper
+- 📚 Поддержка длинных текстов (автоматическая разбивка и склейка)
+- 🌍 10 языков: русский, английский, китайский, японский, корейский, немецкий, французский, испанский, португальский, итальянский
 
-Нажми "Fork" на GitHub.
+## API
 
-### 2. Добавь в RunPod
+### Endpoint
 
-1. Зайди на [RunPod Serverless](https://www.runpod.io/console/serverless)
-2. Нажми **"Add your repo"**
-3. Подключи свой GitHub
-4. Выбери форкнутый репозиторий
-5. Настрой:
-   - **GPU**: RTX 4090 или RTX 3090
-   - **Min Workers**: 0
-   - **Max Workers**: 1-3
+```
+POST https://api.runpod.ai/v2/{ENDPOINT_ID}/run
+```
 
-### 3. Получи API
+### Input параметры
 
-После деплоя получишь:
-- **Endpoint ID**: `xxxxxxxx`
-- **API Key**: в настройках аккаунта
+| Параметр | Тип | Обязательный | Описание |
+|----------|-----|--------------|----------|
+| text | string | ✅ | Текст для озвучки (до 100k символов) |
+| ref_audio_base64 | string | ✅ | Образец голоса в base64 |
+| ref_text | string | ❌ | Текст из образца (авто-распознается если не передан) |
+| language | string | ❌ | Язык (по умолчанию "Russian") |
+| max_chunk_size | int | ❌ | Размер части в символах (по умолчанию 1500) |
 
-## Использование API
+### Output
+
+```json
+{
+  "audio_base64": "base64 encoded WAV",
+  "sample_rate": 24000,
+  "ref_text_used": "распознанный или переданный текст образца",
+  "chunks_count": 27,
+  "total_chars": 40000,
+  "duration_seconds": 1847.5
+}
+```
+
+## Пример использования
 
 ### Python
 
 ```python
-import runpod
+import requests
 import base64
 
-runpod.api_key = "ваш_api_key"
+API_KEY = "your_api_key"
+ENDPOINT_ID = "your_endpoint_id"
 
-# Синхронный запрос (ждём результат)
-result = runpod.run_sync(
-    endpoint_id="ваш_endpoint_id",
-    input={
-        "text": "Привет! Это тестовая озвучка.",
-        "voice": "Vivian",
-        "language": "Russian"
+# Читаем образец голоса
+with open("voice_sample.mp3", "rb") as f:
+    ref_audio = base64.b64encode(f.read()).decode()
+
+# Отправляем запрос
+response = requests.post(
+    f"https://api.runpod.ai/v2/{ENDPOINT_ID}/run",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    json={
+        "input": {
+            "text": "Ваш длинный текст здесь...",
+            "ref_audio_base64": ref_audio,
+            "language": "Russian"
+        }
     }
 )
 
-# Сохраняем аудио
-audio_bytes = base64.b64decode(result["audio_base64"])
-with open("output.wav", "wb") as f:
-    f.write(audio_bytes)
+job_id = response.json()["id"]
+
+# Ждём результат
+import time
+while True:
+    status = requests.get(
+        f"https://api.runpod.ai/v2/{ENDPOINT_ID}/status/{job_id}",
+        headers={"Authorization": f"Bearer {API_KEY}"}
+    ).json()
+    
+    if status["status"] == "COMPLETED":
+        audio_data = base64.b64decode(status["output"]["audio_base64"])
+        with open("output.wav", "wb") as f:
+            f.write(audio_data)
+        break
+    elif status["status"] == "FAILED":
+        print(f"Error: {status.get('error')}")
+        break
+    
+    time.sleep(5)
 ```
 
-### cURL
+## Деплой
 
-```bash
-curl -X POST "https://api.runpod.ai/v2/ВАШ_ENDPOINT_ID/runsync" \
-  -H "Authorization: Bearer ВАШ_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input": {
-      "text": "Привет мир!",
-      "voice": "Vivian",
-      "language": "Russian"
-    }
-  }'
-```
+1. Создай репозиторий на GitHub
+2. Загрузи файлы: `handler.py`, `Dockerfile`
+3. RunPod → Serverless → New Endpoint → Import GitHub Repository
+4. Выбери GPU 24GB+
+5. Установи Execution Timeout: 600+ секунд (для длинных текстов)
 
-### Google Apps Script
+## Производительность
 
-```javascript
-function generateSpeech(text, voice, language) {
-  const ENDPOINT = "https://api.runpod.ai/v2/ВАШ_ENDPOINT_ID/runsync";
-  const API_KEY = "ваш_api_key";
-  
-  const response = UrlFetchApp.fetch(ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer " + API_KEY,
-      "Content-Type": "application/json"
-    },
-    payload: JSON.stringify({
-      input: { text, voice, language }
-    }),
-    muteHttpExceptions: true
-  });
-  
-  const result = JSON.parse(response.getContentText());
-  
-  if (result.output && result.output.audio_base64) {
-    return result.output.audio_base64;
-  }
-  
-  throw new Error(result.error || "Ошибка генерации");
-}
+| Длина текста | Примерное время | Длительность аудио |
+|--------------|-----------------|-------------------|
+| 1,000 символов | ~30 сек | ~1 мин |
+| 10,000 символов | ~3-5 мин | ~10 мин |
+| 40,000 символов | ~15-20 мин | ~30-40 мин |
 
-// Сохранение в Google Drive
-function saveAudioToDrive(base64Audio, filename) {
-  const blob = Utilities.newBlob(
-    Utilities.base64Decode(base64Audio),
-    "audio/wav",
-    filename
-  );
-  return DriveApp.createFile(blob);
-}
-```
-
-## Параметры запроса
-
-| Параметр | Тип | Обязательный | По умолчанию | Описание |
-|----------|-----|--------------|--------------|----------|
-| text | string | ✅ | - | Текст для озвучки (до 10000 символов) |
-| voice | string | ❌ | "Vivian" | Голос |
-| language | string | ❌ | "Russian" | Язык |
-
-## Доступные голоса
-
-- **Vivian** — женский, молодой
-- **Ryan** — мужской, молодой  
-- **Cherry** — женский, мягкий
-- **Ethan** — мужской, зрелый
-- **Aria** — женский, нейтральный
-
-## Поддерживаемые языки
-
-Russian, English, Chinese, Japanese, Korean, German, French, Spanish, Portuguese, Italian
+*На RTX 4090 / A100*
 
 ## Стоимость
 
-- **Cold start**: ~30-60 сек (первый запрос после простоя)
-- **Генерация**: ~$0.0004/сек GPU (RTX 4090)
-- **30 мин аудио**: ~$0.15-0.25
-
-## Локальная разработка
-
-```bash
-# Клонируй репозиторий
-git clone https://github.com/ВАШ_USERNAME/qwen3-tts-runpod.git
-cd qwen3-tts-runpod
-
-# Собери образ
-docker build -t qwen3-tts .
-
-# Запусти локально
-docker run --gpus all -p 8000:8000 qwen3-tts
-```
-
-## Лицензия
-
-MIT
+- ~$0.50-1.00 за 40k символов (30 мин аудио)
+- RTX 4090: $0.00044/сек
+- Оплата только за время генерации (Min Workers = 0)
