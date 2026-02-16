@@ -39,11 +39,13 @@ def transcribe_audio(audio_path):
 
 def split_text(text, max_chars=1500):
     """Разбивает текст на части по предложениям"""
+    import re
+    
     # Нормализуем переносы строк
     text = text.replace('\n', ' ').replace('\r', ' ')
+    text = re.sub(r'\s+', ' ', text).strip()
     
     # Разделители предложений
-    import re
     sentences = re.split(r'(?<=[.!?])\s+', text)
     
     chunks = []
@@ -60,7 +62,6 @@ def split_text(text, max_chars=1500):
                 chunks.append(current.strip())
                 current = ""
             
-            # Разбиваем длинное предложение по запятым
             parts = s.split(',')
             for part in parts:
                 part = part.strip()
@@ -96,6 +97,7 @@ def handler(job):
         ref_audio_base64 = job_input.get("ref_audio_base64")
         ref_text = job_input.get("ref_text", "")
         max_chunk_size = job_input.get("max_chunk_size", 1500)
+        pause_duration = job_input.get("pause_duration", 0.5)
         
         if not ref_audio_base64:
             return {"error": "Параметр 'ref_audio_base64' обязателен для клонирования голоса"}
@@ -138,11 +140,10 @@ def handler(job):
             
             print(f"Часть {i+1}/{total_chunks} готова")
         
-        # Склеиваем все части
+        # Склеиваем все части с паузами
         print("Склеиваем аудио...")
         
-        # Добавляем небольшую паузу между частями (0.3 сек)
-        pause = np.zeros(int(sr * 0.3))
+        pause = np.zeros(int(sr * pause_duration))
         
         audio_with_pauses = []
         for i, audio in enumerate(all_audio):
@@ -158,7 +159,6 @@ def handler(job):
         buffer.seek(0)
         audio_base64 = base64.b64encode(buffer.read()).decode('utf-8')
         
-        # Считаем длительность
         duration_seconds = len(final_audio) / sr
         
         return {
